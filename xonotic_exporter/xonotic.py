@@ -148,23 +148,27 @@ class XonoticMetricsProtocol(XonoticProtocol):
     )
 
     def __init__(self, loop, rcon_password, rcon_mode, retries_count=3,
-                 timeout=3, read_timeout=0.4, initial_wait=0.8):
+                 timeout=3):
         super().__init__(loop, rcon_password, rcon_mode)
         self.retries_count = retries_count
         self.timeout = timeout
-        self.read_timeout = read_timeout
-        self.initial_wait = initial_wait
 
-    async def rcon_read(self, read_timeout, initial_wait=1.0):
-        await asyncio.sleep(initial_wait, loop=self.loop)
-        val = b""
+    async def rcon_read(self):
+        start_time = time.monotonic()
+        val = await asyncio.wait_for(self.rcon_queue.get(), self.timeout,
+                                     loop=self.loop)
+        rtt_time = time.monotonic() - start_time
         while True:
+            wait_time = max(rtt_time * 1.5, 0.2)
             try:
+                start_time = time.monotonic()
                 val += await asyncio.wait_for(
                     self.rcon_queue.get(),
-                    read_timeout,
+                    wait_time,
                     loop=self.loop
                 )
+                read_time = time.monotonic() - start_time
+                rtt_time = rtt_time * 0.85 + read_time * 0.15
             except asyncio.TimeoutError:
                 return val
 
@@ -186,7 +190,7 @@ class XonoticMetricsProtocol(XonoticProtocol):
     async def get_rcon_metrics(self):
         async def try_load_metrics():
             await self.retry(self.rcon, "sv_public\0status 1")
-            result = await self.rcon_read(self.read_timeout, self.initial_wait)
+            result = await self.rcon_read()
             return self.parse_rcon_metrics(result)
 
         value = await self.retry(try_load_metrics)
@@ -198,7 +202,7 @@ class XonoticMetricsProtocol(XonoticProtocol):
                 task = async_fun(*args, **kwargs)
                 value = await asyncio.wait_for(task, self.timeout,
                                                loop=self.loop)
-            except OSError:
+            except (OSError, asyncio.TimeoutError):
                 continue
             else:
                 return value
@@ -208,6 +212,7 @@ class XonoticMetricsProtocol(XonoticProtocol):
     @classmethod
     def parse_rcon_metrics(cls, metrics_data):
         # TODO: Refactor this
+        # TODO: Add protection against reordering
         metrics = metrics_data.decode("utf8", "ignore").splitlines()
         handling_players = False
         start_players = False
