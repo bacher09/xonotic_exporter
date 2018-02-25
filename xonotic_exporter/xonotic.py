@@ -27,10 +27,10 @@ class RconMode(enum.IntEnum):
 
 class XonoticProtocol:
 
-    def __init__(self, loop, addr, rcon_password, rcon_mode):
+    def __init__(self, loop, rcon_password, rcon_mode):
         self.loop = loop
         self.transport = None
-        self.addr = addr
+        self.addr = None
         self.ping_future = None
         self.ping_lock = asyncio.Lock(loop=loop)
         self.challenge_future = None
@@ -48,6 +48,7 @@ class XonoticProtocol:
 
     def connection_made(self, transport):
         self.transport = transport
+        self.addr = self.transport.get_extra_info('peername')
 
     def datagram_received(self, data, addr):
         if addr != self.addr:
@@ -146,9 +147,9 @@ class XonoticMetricsProtocol(XonoticProtocol):
         r'^players:\s+(?P<count>\d+)\s+active\s+\((?P<max>\d+)\s+max\)'
     )
 
-    def __init__(self, loop, addr, rcon_password, rcon_mode, retries_count=3,
+    def __init__(self, loop, rcon_password, rcon_mode, retries_count=3,
                  timeout=3, read_timeout=0.4, initial_wait=0.8):
-        super().__init__(loop, addr, rcon_password, rcon_mode)
+        super().__init__(loop, rcon_password, rcon_mode)
         self.retries_count = retries_count
         self.timeout = timeout
         self.read_timeout = read_timeout

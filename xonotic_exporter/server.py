@@ -106,7 +106,6 @@ class XonoticExporter:
         def proto_builder():
             return XonoticMetricsProtocol(
                 loop=self.loop,
-                addr=addr,
                 rcon_password=server_conf['rcon_password'],
                 rcon_mode=server_conf['rcon_mode']
             )
