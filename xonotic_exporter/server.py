@@ -74,11 +74,15 @@ class XonoticExporter:
     def init_routes(self):
         self.app.router.add_get('/', self.root_handler)
         self.app.router.add_get('/metrics/{server}', self.metrics_handler)
+        self.app.router.add_get('/metrics/', self.redirect_handler)
 
     async def root_handler(self, request):
         servers = sorted(self.config.keys())
         main = MAIN_TEMPLATE.render(servers=servers)
         return web.Response(text=main, content_type="text/html")
+
+    async def redirect_handler(self, request):
+        return web.HTTPFound('/')
 
     async def metrics_handler(self, request):
         server = request.match_info.get('server')
