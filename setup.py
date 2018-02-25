@@ -9,7 +9,9 @@ setup(
     packages=["xonotic_exporter"],
     install_requires=[
         "xrcon==0.1",
-        "aiohttp>=3.0,<4.0"
+        "aiohttp>=3.0,<4.0",
+        "mako>=1.0.0,<1.1.0",
+        "pyyaml"
     ],
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -24,6 +26,10 @@ setup(
         "Topic :: Games/Entertainment :: First Person Shooters",
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
     ],
+    entry_points="""\
+    [console_scripts]
+    xonotic_exporter = xonotic_exporter.server:XonoticExporterCli.start
+    """,
     platforms='any',
     keywords=[
         'rcon', 'xonotic', 'darkplaces', 'quake', 'nexuiz',
