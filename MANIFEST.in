@@ -1,2 +1,3 @@
 include LICENSE.txt
+include xonotic_exporter/templates/*.mako
 include xonotic_exporter/config_schema.json

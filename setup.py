@@ -28,7 +28,7 @@ setup(
     ],
     entry_points="""\
     [console_scripts]
-    xonotic_exporter = xonotic_exporter.server:XonoticExporterCli.start
+    xonotic_exporter = xonotic_exporter.cli:XonoticExporterCli.start
     """,
     platforms='any',
     keywords=[
