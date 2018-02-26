@@ -7,12 +7,7 @@ import re
 
 PING_Q2_PACKET = b"\xFF\xFF\xFF\xFFping"
 PONG_Q2_PACKET = b"\xFF\xFF\xFF\xFFack"
-COLORS_RE = re.compile(r"\^(?:\d|x[\dA-Fa-f]{3})")
 # TODO: add logging
-
-
-def strip_colors(text):
-    return COLORS_RE.sub('', text)
 
 
 class RetryError(Exception):
@@ -132,45 +127,11 @@ class XonoticProtocol:
 
 class XonoticMetricsProtocol(XonoticProtocol):
 
-    SV_PUBLIC_RE = re.compile(r'^"sv_public"\s+is\s+"(-?\d+)"')
-    HOST_RE = re.compile(r'^host:\s+(.+)$')
-    MAP_RE = re.compile('^map:\s+([^\s]+)')
-    TIMING_RE = re.compile(
-        r'^timing:\s+'
-        r'(?P<cpu>-?[\d\.]+)%\s+CPU,\s+'
-        r'(?P<lost>-?[\d\.]+)%\s+lost,\s+'
-        r'offset\s+avg\s+(?P<offset_avg>-?[\d\.]+)ms,\s+'
-        r'max\s+(?P<max>-?[\d\.]+)ms,\s+'
-        r'sdev\s+(?P<sdev>-?[\d\.]+)ms'
-    )
-    PLAYERS_RE = re.compile(
-        r'^players:\s+(?P<count>\d+)\s+active\s+\((?P<max>\d+)\s+max\)'
-    )
-
     def __init__(self, loop, rcon_password, rcon_mode, retries_count=3,
                  timeout=3):
         super().__init__(loop, rcon_password, rcon_mode)
         self.retries_count = retries_count
         self.timeout = timeout
-
-    async def rcon_read(self):
-        start_time = time.monotonic()
-        val = await asyncio.wait_for(self.rcon_queue.get(), self.timeout,
-                                     loop=self.loop)
-        rtt_time = time.monotonic() - start_time
-        while True:
-            wait_time = max(rtt_time * 1.5, 0.2)
-            try:
-                start_time = time.monotonic()
-                val += await asyncio.wait_for(
-                    self.rcon_queue.get(),
-                    wait_time,
-                    loop=self.loop
-                )
-                read_time = time.monotonic() - start_time
-                rtt_time = rtt_time * 0.85 + read_time * 0.15
-            except asyncio.TimeoutError:
-                return val
 
     async def ping(self):
         rtt = await self.retry(super().ping, timeout=self.timeout)
@@ -190,8 +151,8 @@ class XonoticMetricsProtocol(XonoticProtocol):
     async def get_rcon_metrics(self):
         async def try_load_metrics():
             await self.retry(self.rcon, "sv_public\0status 1")
-            result = await self.rcon_read()
-            return self.parse_rcon_metrics(result)
+            metrics = await self.read_rcon_metrics()
+            return metrics
 
         value = await self.retry(try_load_metrics)
         return value
@@ -202,102 +163,201 @@ class XonoticMetricsProtocol(XonoticProtocol):
                 task = async_fun(*args, **kwargs)
                 value = await asyncio.wait_for(task, self.timeout,
                                                loop=self.loop)
-            except (OSError, asyncio.TimeoutError):
+            except (OSError, asyncio.TimeoutError, IllegalState):
                 continue
             else:
                 return value
 
         raise RetryError("Retries limit exceeded")
 
-    @classmethod
-    def parse_rcon_metrics(cls, metrics_data):
-        # TODO: Refactor this
-        # TODO: Add protection against reordering
-        metrics = metrics_data.decode("utf8", "ignore").splitlines()
-        handling_players = False
-        start_players = False
-        metrics_dct = {}
-        metrics_dct['players_active'] = 0
-        metrics_dct['players_spectators'] = 0
-        metrics_dct['players_bots'] = 0
-        for line in metrics:
-            if start_players:
-                if line.startswith('IP  ') or line.startswith('^2IP   '):
-                    handling_players = True
-                    start_players = False
+    async def read_rcon_metrics(self):
+        parser = XonoticMetricsParser()
+        start_time = time.monotonic()
+        val = await asyncio.wait_for(self.rcon_queue.get(), self.timeout,
+                                     loop=self.loop)
+        parser.feed_data(val)
+        rtt_time = time.monotonic() - start_time
+        while not parser.done:
+            wait_time = max(rtt_time * 1.6, 0.2)
+            start_time = time.monotonic()
+            val = await asyncio.wait_for(self.rcon_queue.get(), wait_time,
+                                         loop=self.loop)
+            read_time = time.monotonic() - start_time
+            rtt_time = rtt_time * 0.85 + read_time * 0.15
+            parser.feed_data(val)
 
-                continue
+        return parser.metrics
 
-            if handling_players:
-                player_data = line.split()
-                if len(player_data) < 5:
-                    # we received something strange, let's ignore it
-                    continue
 
-                player_ip = strip_colors(player_data[0].strip())
-                if player_ip == 'botclient':
-                    metrics['players_bots'] += 1
+class IllegalState(ValueError):
+    pass
 
+
+class XonoticMetricsParser:
+
+    COLORS_RE = re.compile(b"\^(?:\d|x[\dA-Fa-f]{3})")
+    SV_PUBLIC_RE = re.compile(b'^"sv_public"\s+is\s+"(-?\d+)"')
+    HOST_RE = re.compile(b'^host:\s+(.+)$')
+    MAP_RE = re.compile(b'^map:\s+([^\s]+)')
+    TIMING_RE = re.compile(
+        b'^timing:\s+'
+        b'(?P<cpu>-?[\d\.]+)%\s+CPU,\s+'
+        b'(?P<lost>-?[\d\.]+)%\s+lost,\s+'
+        b'offset\s+avg\s+(?P<offset_avg>-?[\d\.]+)ms,\s+'
+        b'max\s+(?P<max>-?[\d\.]+)ms,\s+'
+        b'sdev\s+(?P<sdev>-?[\d\.]+)ms'
+    )
+    PLAYERS_RE = re.compile(
+        b'^players:\s+(?P<count>\d+)\s+active\s+\((?P<max>\d+)\s+max\)'
+    )
+
+    def __init__(self):
+        self.state_fun = self.parse_sv_public
+        self.done = False
+        self.players_count = None
+        self.status_players = None
+        self.metrics = {}
+        self.metrics['players_active'] = 0
+        self.metrics['players_spectators'] = 0
+        self.metrics['players_bots'] = 0
+        self.old_data = b""
+
+    def feed_data(self, binary_data):
+        data = self.old_data + binary_data
+        while not self.done:
+            try:
+                binary_line, data = data.split(b'\n', 1)
+            except ValueError:
+                # not enough data for unpacking
+                self.old_data = data
+                return
+            else:
+                self.process_line(binary_line)
+
+    def process_line(self, line):
+        if not self.done:
+            self.state_fun(line)
+        else:
+            self.state_error(line)
+
+    def state_error(self, line):
+        # TODO: add more info about state
+        raise IllegalState("Received bad input")
+
+    def parse_sv_public(self, line):
+        sv_public_m = self.SV_PUBLIC_RE.match(line)
+        if sv_public_m is not None:
+            val = sv_public_m.group(1)
+            try:
+                val = int(val)
+            except ValueError:
+                pass
+            else:
+                self.metrics['sv_public'] = val
+
+            self.state_fun = self.parse_hostname  # update state
+        else:
+            self.state_error(line)
+
+    def parse_hostname(self, line):
+        host_m = self.HOST_RE.match(line)
+        if host_m is not None:
+            val = host_m.group(1).strip()
+            self.metrics['hostname'] = val.decode("utf8", "ignore")
+            self.state_fun = self.parse_version
+        else:
+            self.state_error(line)
+
+    def parse_version(self, line):
+        if line.startswith(b"version:"):
+            self.state_fun = self.parse_protocol
+        else:
+            self.state_error(line)
+
+    def parse_protocol(self, line):
+        if line.startswith(b"protocol:"):
+            self.state_fun = self.parse_map
+        else:
+            self.state_error(line)
+
+    def parse_map(self, line):
+        map_m = self.MAP_RE.match(line)
+        if map_m is not None:
+            val = map_m.group(1)
+            self.metrics['map'] = val.decode("utf8", "ignore")
+            self.state_fun = self.parse_timing
+        else:
+            self.state_error(line)
+
+    def parse_timing(self, line):
+        timing_m = self.TIMING_RE.match(line)
+        if timing_m is not None:
+            vals = timing_m.groupdict()
+            for key, val in vals.items():
                 try:
-                    score = int(player_data[4])
-                except (ValueError, IndexError):
-                    continue
-
-                if score == -666:
-                    metrics_dct['players_spectators'] += 1
+                    val = float(val)
+                except ValueError:
+                    pass
                 else:
-                    metrics_dct['players_active'] += 1
+                    self.metrics["timing_{0}".format(key)] = val
 
-                continue
+            self.state_fun = self.parse_players
+        else:
+            self.state_error(line)
 
-            sv_public_m = cls.SV_PUBLIC_RE.match(line)
-            if sv_public_m is not None:
-                val = sv_public_m.group(1)
+    def parse_players(self, line):
+        players_m = self.PLAYERS_RE.match(line)
+        if players_m is not None:
+            for key, val in players_m.groupdict().items():
                 try:
                     val = int(val)
                 except ValueError:
                     pass
                 else:
-                    metrics_dct['sv_public'] = val
+                    self.metrics["players_{0}".format(key)] = val
 
-                continue
+            self.state_fun = self.parse_status_headers
+        else:
+            self.state_error(line)
 
-            host_m = cls.HOST_RE.match(line)
-            if host_m is not None:
-                val = host_m.group(1).strip()
-                metrics_dct['hostname'] = val
-                continue
+    def parse_status_headers(self, line):
+        if line.startswith(b'IP  ') or line.startswith(b'^2IP   '):
+            players_count = self.metrics.get('players_count')
+            if players_count is not None and players_count > 0:
+                self.players_count = players_count
+                self.status_players = 0
+                self.state_fun = self.parse_players_info
+            else:
+                self.done = True
+                self.state_fun = None
 
-            map_m = cls.MAP_RE.match(line)
-            if map_m is not None:
-                val = map_m.group(1)
-                metrics_dct['map'] = val
-                continue
+    def parse_players_info(self, line):
+        player_data = line.split()
+        if len(player_data) < 5:
+            # we received something strange
+            error = "Received bad line, not enough fields: {0!r}".format(line)
+            raise IllegalState(error)
 
-            timing_m = cls.TIMING_RE.match(line)
-            if timing_m is not None:
-                vals = timing_m.groupdict()
-                for key, val in vals.items():
-                    try:
-                        val = float(val)
-                    except ValueError:
-                        pass
-                    else:
-                        metrics_dct["timing_{0}".format(key)] = val
+        player_ip = self.strip_colors(player_data[0].strip())
+        self.status_players += 1
 
-                continue
+        if self.status_players == self.players_count:
+            self.done = True
+            self.state_fun = None
 
-            players_m = cls.PLAYERS_RE.match(line)
-            if players_m is not None:
-                for key, val in players_m.groupdict().items():
-                    try:
-                        val = int(val)
-                    except ValueError:
-                        pass
-                    else:
-                        metrics_dct["players_{0}".format(key)] = val
+        if player_ip == b'botclient':
+            self.metrics['players_bots'] += 1
 
-                start_players = True
-                continue
+        try:
+            score = int(player_data[4])
+        except (ValueError, IndexError):
+            raise IllegalState("Bad player score: {0!r}".format(line))
 
-        return metrics_dct
+        if score == -666:
+            self.metrics['players_spectators'] += 1
+        else:
+            self.metrics['players_active'] += 1
+
+    @classmethod
+    def strip_colors(cls, binary_data):
+        return cls.COLORS_RE.sub(b'', binary_data)
