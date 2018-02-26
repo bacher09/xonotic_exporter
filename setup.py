@@ -7,6 +7,7 @@ setup(
     author="Slava Bacherikov",
     author_email="slava@bacher09.org",
     packages=["xonotic_exporter"],
+    include_package_data=True,
     install_requires=[
         "xrcon==0.1",
         "aiohttp>=3.0,<4.0",
