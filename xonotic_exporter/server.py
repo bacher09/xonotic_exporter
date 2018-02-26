@@ -1,4 +1,3 @@
-import asyncio
 import os.path
 from mako.lookup import TemplateLookup
 from aiohttp import web
@@ -28,26 +27,24 @@ class XonoticExporter:
 
     def init_routes(self):
         self.app.router.add_get('/', self.root_handler)
-        self.app.router.add_get('/metrics/{server}', self.metrics_handler)
-        self.app.router.add_get('/metrics/', self.redirect_handler)
+        self.app.router.add_get('/metrics', self.metrics_handler)
 
     async def root_handler(self, request):
         servers = sorted(self.config.keys())
         main = self.index_template.render(servers=servers)
         return web.Response(text=main, content_type="text/html")
 
-    async def redirect_handler(self, request):
-        return web.HTTPFound('/')
-
     async def metrics_handler(self, request):
-        server = request.match_info.get('server')
+        server = request.query.get('target')
         if server is None:
-            # "Server is empty"
-            raise web.HTTPInternalServerError()
+            return web.Response(text="'target' parameter must be specified",
+                                status=400, content_type="text/plain")
 
         if server not in self.config:
-            # "There is no such server in config"
-            return web.HTTPNotFound()
+            msg = "there is no such server in configuration: {0!r}" \
+                    .format(server)
+            return web.Response(text=msg, status=400,
+                                content_type="text/plain")
 
         metrics = await self.get_metrics(server)
         page = self.metrics_template.render(server=server, **metrics)

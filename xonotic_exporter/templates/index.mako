@@ -6,7 +6,7 @@
         <h1>Xonotic Exporter</h1>
         <ul>
             % for server in servers:
-                <li><a href="/metrics/${server | u}">${server | h}</a></li>
+                <li><a href="/metrics?target=${server | u}">${server | h}</a></li>
             % endfor
         </ul>
     </body>
