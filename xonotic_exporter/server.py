@@ -1,8 +1,12 @@
 import asyncio
 import argparse
+import json
 from mako.template import Template
 from aiohttp import web
+import jsonschema
 import yaml
+import os.path
+import os
 from .xonotic import XonoticMetricsProtocol
 
 
@@ -63,6 +67,9 @@ xonotic_rtt{instance=${server | quotes}, from=${current_host | quotes}} ${metric
 
 class XonoticExporter:
 
+    CONFIG_DEFAULT_PORT = 26000
+    CONFIG_DEFAULT_RCON_MODE = 1
+
     def __init__(self, loop, servers_config, host='127.0.0.1', port=9260):
         self.loop = loop
         self.config = servers_config
@@ -101,13 +108,14 @@ class XonoticExporter:
     async def get_metrics(self, server):
         server_conf = self.config[server]
         host = server_conf['server']
-        addr = (host, server_conf['port'])
+        addr = (host, server_conf.get('port', self.CONFIG_DEFAULT_PORT))
+        rcon_mode = server_conf.get('rcon_mode', self.CONFIG_DEFAULT_RCON_MODE)
 
         def proto_builder():
             return XonoticMetricsProtocol(
                 loop=self.loop,
                 rcon_password=server_conf['rcon_password'],
-                rcon_mode=server_conf['rcon_mode']
+                rcon_mode=rcon_mode
             )
 
         connection_task = self.loop.create_datagram_endpoint(
@@ -130,6 +138,7 @@ class XonoticExporterCli:
 
     def __init__(self):
         self.parser = self.build_parser()
+        self.config_schema = self.load_configuration_schema()
 
     def run(self, args=None):
         args = self.parser.parse_args(args)
@@ -139,8 +148,21 @@ class XonoticExporterCli:
         exporter.run()
 
     def parse_config(self, conf_file):
-        # TODO: Add json schema validation
-        return yaml.load(conf_file.read())
+        # TODO: display error on invalid yaml file
+        config = yaml.load(conf_file.read())
+        try:
+            self.config_schema.validate(config)
+        except jsonschema.ValidationError as exc:
+            path = "/".join(exc.path)
+            message = "{prog}: configuration error: {msg} at {path}\n".format(
+                prog=self.parser.prog,
+                msg=exc.message,
+                path=path
+            )
+            self.parser.print_usage()
+            self.parser.exit(os.EX_CONFIG, message)
+        else:
+            return config
 
     @staticmethod
     def port_validator(port_str):
@@ -169,3 +191,15 @@ class XonoticExporterCli:
     def start(cls):
         obj = XonoticExporterCli()
         obj.run()
+
+    @staticmethod
+    def load_configuration_schema():
+        path = os.path.dirname(__file__)
+        schema_path = os.path.join(path, 'config_schema.json')
+        with open(schema_path, "r") as f:
+            schema_json = json.load(f)
+
+        return jsonschema.Draft4Validator(
+            schema_json,
+            format_checker=jsonschema.FormatChecker()
+        )

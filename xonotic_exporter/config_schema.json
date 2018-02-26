@@ -1,0 +1,45 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "title": "Xonotic exporter configuration schema",
+    "type": "object",
+    "patternProperties": {
+        "[0-9A-Za-z]([0-9A-Za-z\\-\\._]*[0-9A-Za-z])?": {
+            "$ref": "#/definitions/server"
+        }
+    },
+    "additionalProperties": false,
+    "minProperties": 1,
+    "definitions": {
+        "server": {
+            "type": "object",
+            "properties": {
+                "server": {
+                    "type": "string",
+                    "oneOf": [
+                        {"format": "ipv4"},
+                        {"format": "ipv6"},
+                        {"format": "hostname"}
+                    ]
+                },
+                "port": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "default": 26000
+                },
+                "rcon_mode": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 2,
+                    "default": 1
+                },
+                "rcon_password": {
+                    "type": "string",
+                    "maxLength": 64
+                }
+            },
+            "required": ["server", "rcon_password"],
+            "additionalProperties": false
+        }
+    }
+}
