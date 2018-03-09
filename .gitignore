@@ -3,3 +3,9 @@
 venv/
 *.egg-info
 dist/
+.tox/
+.eggs/
+.pytest_cache/
+.coverage
+htmlcov/
+server.yml

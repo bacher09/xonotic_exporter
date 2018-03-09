@@ -347,6 +347,7 @@ class XonoticMetricsParser:
 
         if player_ip == b'botclient':
             self.metrics['players_bots'] += 1
+            return
 
         try:
             score = int(player_data[4])
