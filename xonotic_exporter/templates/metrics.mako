@@ -14,7 +14,9 @@
     current_host = socket.getfqdn()
 %>
 # server: ${server}
+% if hostname is not UNDEFINED:
 # hostname: ${hostname}
+% endif
 # map: ${map}
 xonotic_sv_public{instance=${server | quotes}} ${metric(sv_public)}
 

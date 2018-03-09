@@ -15,7 +15,13 @@ setup(
         "jsonschema>=2.6.0,<2.7.0",
         "pyyaml"
     ],
-    tests_require=['pytest', 'pytest-cov'],
+    tests_require=[
+        'pytest',
+        'pytest-cov',
+        'pytest-aiohttp',
+        'pytest-mock',
+        'prometheus_client'
+    ],
     setup_requires=['pytest-runner'],
     classifiers=[
         "Development Status :: 3 - Alpha",
