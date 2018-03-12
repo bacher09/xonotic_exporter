@@ -32,7 +32,9 @@ class XonoticProtocol:
         self.challenge_lock = asyncio.Lock(loop=loop)
         self.rcon_queue = asyncio.Queue(maxsize=50, loop=loop)
         self.rcon_password = rcon_password
+        self.set_mode(rcon_mode)
 
+    def set_mode(self, rcon_mode):
         if isinstance(rcon_mode, int):
             rcon_mode = RconMode(rcon_mode)
 
@@ -74,7 +76,7 @@ class XonoticProtocol:
     def connection_lost(self, exc):
         pass
 
-    async def ping(self, timeout=3.0):
+    async def ping(self):
         "Return rtt time for remote server"
         await self.ping_lock
         try:
