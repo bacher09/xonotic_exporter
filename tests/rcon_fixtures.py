@@ -1,8 +1,6 @@
-from xonotic_exporter.xonotic import XonoticMetricsParser, IllegalState
-import pytest
 
 
-VALID_RCON_RESPONSE1 = [
+RESPONSE1 = [
     b'"sv_public" is "1" ["1"]\n'
     b'host:     [\xe5\x8a\x9b] TheRegulars Instagib Server [git]\n'
     b'version:  Xonotic build 01:31:45 Apr 17 2017 - (gamename Xonotic)\n'
@@ -50,7 +48,7 @@ VALID_RCON_RESPONSE1 = [
 ]
 
 
-VALID_RCON_RESPONSE2 = [
+RESPONSE2 = [
     b'"sv_public" is "-1" ["1"]\n'
     b'host:     [\xe5\x8a\x9b] TheRegulars - Mars \xe2\x98\xa0 [git]\n'
     b'version:  Xonotic build 01:31:45 Apr 17 2017 - (gamename Xonotic)\n'
@@ -64,7 +62,7 @@ VALID_RCON_RESPONSE2 = [
 ]
 
 
-VALID_RCON_RESPONSE3 = [
+RESPONSE3 = [
     b'"sv_public" is "1" ["1"]\n'
     b'host:     quake\n'
     b'version:  Xonotic build 13:26:57 Apr  1 2017 -'
@@ -86,50 +84,7 @@ VALID_RCON_RESPONSE3 = [
 ]
 
 
-INVALID_RCON_RESPONSE = [
-    VALID_RCON_RESPONSE1[1],
-    VALID_RCON_RESPONSE1[0],
+UNORDERED_RESPONSE = [
+    RESPONSE1[1],
+    RESPONSE1[0],
 ]
-
-
-@pytest.fixture(scope="function")
-def parser():
-    return XonoticMetricsParser()
-
-
-def test_valid_multiple(parser):
-    for data in VALID_RCON_RESPONSE1:
-        parser.feed_data(data)
-
-    assert parser.metrics['sv_public'] == 1
-    assert parser.metrics['map'] == 'dissocia'
-    assert parser.metrics['players_count'] == 15
-    assert parser.done is True
-
-
-def test_invalid_multiple(parser):
-    with pytest.raises(IllegalState):
-        for data in INVALID_RCON_RESPONSE:
-            parser.feed_data(data)
-
-
-def test_valid_simple(parser):
-    for data in VALID_RCON_RESPONSE2:
-        parser.feed_data(data)
-
-    assert parser.metrics['sv_public'] == -1
-    assert parser.metrics['map'] == 'xonwall'
-    assert parser.metrics['players_count'] == 0
-    assert parser.metrics['timing_cpu'] == pytest.approx(3.0, 0.1)
-    assert parser.done is True
-
-
-def test_parser_with_bots(parser):
-    for data in VALID_RCON_RESPONSE3:
-        parser.feed_data(data)
-
-    assert parser.metrics['sv_public'] == 1
-    assert parser.metrics['players_count'] == 5
-    assert parser.metrics['players_active'] == 0
-    assert parser.metrics['players_spectators'] == 1
-    assert parser.metrics['players_bots'] == 4

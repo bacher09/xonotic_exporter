@@ -1,5 +1,6 @@
 from xonotic_exporter import xonotic
 from xrcon import utils as xon_utils
+import rcon_fixtures
 import asyncio
 import pytest
 
@@ -77,6 +78,18 @@ async def xonotic_proto(loop, rcon_server):
     return proto
 
 
+@pytest.fixture
+async def xonotic_metrics_proto(loop, rcon_server):
+
+    def proto_factory():
+        return xonotic.XonoticMetricsProtocol(loop, "password", 0)
+
+    transport, proto = await loop.create_datagram_endpoint(
+        proto_factory, remote_addr=rcon_server.endpoint
+    )
+    return proto
+
+
 async def test_ping(xonotic_proto, loop):
     rtt = await asyncio.wait_for(xonotic_proto.ping(), TEST_TIMEOUT, loop=loop)
     assert rtt < 1
@@ -122,3 +135,75 @@ async def test_rcon(xonotic_proto, rcon_server, loop, mocker):
     assert b'srcon HMAC-MD4 CHALLENGE' in \
         rcon_server.handle_rcon.call_args[0][0]
     assert b'status 1' in rcon_server.handle_rcon.call_args[0][0]
+
+
+async def test_rcon_metrics(xonotic_metrics_proto, rcon_server):
+
+    def handle_rcon(data, addr):
+        for rcon_chunk in rcon_fixtures.RESPONSE1:
+            packet = xon_utils.RCON_RESPONSE_HEADER + rcon_chunk
+            rcon_server.transport.sendto(packet, addr)
+
+    rcon_server.handle_rcon = handle_rcon
+    rcon_metrics = await xonotic_metrics_proto.get_rcon_metrics()
+    assert rcon_metrics['map'] == 'dissocia'
+    assert rcon_metrics['players_count'] == 15
+    assert rcon_metrics['players_max'] == 20
+    assert rcon_metrics['players_spectators'] == 5
+
+
+async def test_ping_retry(xonotic_metrics_proto, rcon_server):
+    real_ping_handler = rcon_server.ping_received
+    ping_counter = 0
+
+    def ping_received(addr):
+        nonlocal ping_counter
+        ping_counter += 1
+
+        if ping_counter % 3 == 0:  # responding to every 3rd packet
+            real_ping_handler(addr)
+
+    rcon_server.ping_received = ping_received
+    # decrease ping timeout, so tests will take less time
+    xonotic_metrics_proto.timeout = rcon_server.rtt_delay * 2
+    rtt = await xonotic_metrics_proto.ping()
+    assert rtt < 1
+
+
+async def test_metrics(xonotic_metrics_proto, rcon_server):
+
+    def handle_rcon(data, addr):
+        for rcon_chunk in rcon_fixtures.RESPONSE1:
+            packet = xon_utils.RCON_RESPONSE_HEADER + rcon_chunk
+            rcon_server.transport.sendto(packet, addr)
+
+    rcon_server.handle_rcon = handle_rcon
+    # decrease ping timeout, so tests will take less time
+    xonotic_metrics_proto.timeout = rcon_server.rtt_delay * 2
+    metrics = await xonotic_metrics_proto.get_metrics()
+    assert metrics['ping'] < 1
+    assert metrics['map'] == 'dissocia'
+
+
+async def test_retry_limit(xonotic_metrics_proto, rcon_server):
+
+    def ping_received(addr):
+        pass
+
+    rcon_server.ping_received = ping_received
+    xonotic_metrics_proto.timeout = 0.001
+    with pytest.raises(xonotic.RetryError):
+        await xonotic_metrics_proto.ping()
+
+
+def test_set_mode(mocker):
+    xon_proto = xonotic.XonoticProtocol(mocker.Mock(), "test", 0)
+
+    with pytest.raises(ValueError):
+        xon_proto.set_mode(10)
+
+    with pytest.raises(ValueError):
+        xon_proto.set_mode(-1)
+
+    with pytest.raises(ValueError):
+        xon_proto.set_mode("bad")
