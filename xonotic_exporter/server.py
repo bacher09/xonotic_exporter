@@ -30,7 +30,7 @@ class XonoticExporter:
         self.init_templates()
         self.init_routes()
 
-        if hasattr(loop, 'add_signal_handler'):
+        if hasattr(loop, 'add_signal_handler') and hasattr(signal, 'SIGHUP'):
             loop.add_signal_handler(signal.SIGHUP, self.reload)
 
     def init_templates(self):

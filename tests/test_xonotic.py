@@ -165,7 +165,7 @@ async def test_ping_retry(xonotic_metrics_proto, rcon_server):
 
     rcon_server.ping_received = ping_received
     # decrease ping timeout, so tests will take less time
-    xonotic_metrics_proto.timeout = rcon_server.rtt_delay * 2
+    xonotic_metrics_proto.timeout = rcon_server.rtt_delay * 4
     rtt = await xonotic_metrics_proto.ping()
     assert rtt < 1
 
