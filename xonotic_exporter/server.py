@@ -71,7 +71,7 @@ class XonoticExporter:
         status = self.reload()
         if status is None:
             return web.Response(text="Configuration reloading isn't supported",
-                                content_type="text/plain")
+                                status=400 ,content_type="text/plain")
         elif status:
             return web.Response(text="Success", content_type="text/plain")
         else:

@@ -102,6 +102,9 @@ async def test_metrics(cli):
     resp_inv = await cli.get('/metrics', params={"target": "server4"})
     assert resp_inv.status == 400
 
+    resp_inv = await cli.get('/metrics')
+    assert resp_inv.status == 400
+
 
 async def test_get_metrics(rcon_server, loop):  # noqa: F811
     addr, port = rcon_server.endpoint
@@ -122,3 +125,21 @@ async def test_get_metrics(rcon_server, loop):  # noqa: F811
     metrics = await exporter.get_metrics(server_conf)
     assert metrics['map'] == 'dissocia'
     assert metrics['players_count'] == 15
+
+
+async def test_server_reload(loop, aiohttp_client, mocker):
+    provider_mock = mocker.Mock()
+    provider_mock.return_value = FAKE_CONFIG
+    exporter = XonoticExporter(loop, provider_mock)
+    cli = await aiohttp_client(exporter.app)
+    resp = await cli.post("/-/reload")
+    assert resp.status == 200
+
+    provider_mock.return_value = None
+    resp = await cli.post("/-/reload")
+    assert resp.status == 500
+
+    exporter = XonoticExporter(loop, FAKE_CONFIG)
+    cli = await aiohttp_client(exporter.app)
+    resp = await cli.post("/-/reload")
+    assert resp.status == 400
