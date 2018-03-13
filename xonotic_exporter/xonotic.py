@@ -1,5 +1,6 @@
 import asyncio
 import time
+import logging
 from xrcon import utils
 from .metrics_parser import IllegalState, XonoticMetricsParser
 import enum
@@ -7,7 +8,7 @@ import enum
 
 PING_Q2_PACKET = b"\xFF\xFF\xFF\xFFping"
 PONG_Q2_PACKET = b"\xFF\xFF\xFF\xFFack"
-# TODO: add logging
+log = logging.getLogger(__name__)
 
 
 class RetryError(Exception):
@@ -53,11 +54,13 @@ class XonoticProtocol:
             return
 
         if data == PONG_Q2_PACKET and self.ping_future is not None:
+            log.debug("received ping response from %s", addr)
             if self.ping_future.done() or self.ping_future.cancelled():
                 return
 
             self.ping_future.set_result(time.monotonic())
         elif data.startswith(utils.CHALLENGE_RESPONSE_HEADER):
+            log.debug("received challenge response from %s", addr)
             if self.challenge_future is None:
                 return
 
@@ -67,6 +70,7 @@ class XonoticProtocol:
 
             challenge_future.set_result(utils.parse_challenge_response(data))
         elif data.startswith(utils.RCON_RESPONSE_HEADER):
+            log.debug("received rcon response from %s", addr)
             rcon_output = utils.parse_rcon_response(data)
             self.rcon_queue.put_nowait(rcon_output)
 
