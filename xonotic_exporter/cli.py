@@ -4,7 +4,23 @@ import jsonschema
 import json
 import yaml
 import os
+import logging
 from .server import XonoticExporter
+
+
+log = logging.getLogger(__name__)
+
+
+class ConfigError(ValueError):
+    pass
+
+
+class InvalidYamlConfig(ConfigError):
+    pass
+
+
+class InvalidYamlSchema(ConfigError):
+    pass
 
 
 class XonoticExporterCli:
@@ -12,6 +28,7 @@ class XonoticExporterCli:
     DESCRIPTION = 'Xonotic prometheus exporter'
     DEFAULT_HOST = 'localhost'
     DEFAULT_PORT = 9260
+    exporter_factory = XonoticExporter
 
     def __init__(self):
         self.parser = self.build_parser()
@@ -19,27 +36,69 @@ class XonoticExporterCli:
 
     def run(self, args=None):
         args = self.parser.parse_args(args)
-        conf = self.parse_config(args.config)
+
+        try:
+            with args.config as stream:
+                config = self.parse_config(stream)
+        except ConfigError as exc:
+            message = "{prog}: configuration error: {msg}\n".format(
+                prog=self.parser.prog, msg=str(exc)
+            )
+            self.parser.exit(os.EX_CONFIG, message)
+
+        if args.validate:
+            print("Configuration is correct")
+            return
+
+        conf_provider = self.build_configuration_provider(config,
+                                                          args.config.name)
         loop = asyncio.get_event_loop()
-        exporter = XonoticExporter(loop, conf, host=args.host, port=args.port)
+        exporter = self.exporter_factory(loop, conf_provider, host=args.host,
+                                         port=args.port)
         exporter.run()
 
-    def parse_config(self, conf_file):
-        # TODO: display error on invalid yaml file
-        config = yaml.load(conf_file.read())
+    def parse_config(self, str_or_stream):
+        try:
+            config = yaml.load(str_or_stream)
+        except yaml.YAMLError as exc:
+            raise InvalidYamlConfig('Invalid yaml document') from exc
+
+        if not isinstance(config, dict):
+            raise InvalidYamlSchema("yaml should start as object")
+
         try:
             self.config_schema.validate(config)
         except jsonschema.ValidationError as exc:
             path = "/".join(exc.path)
-            message = "{prog}: configuration error: {msg} at {path}\n".format(
-                prog=self.parser.prog,
-                msg=exc.message,
-                path=path
-            )
-            self.parser.print_usage()
-            self.parser.exit(os.EX_CONFIG, message)
+            message = "{msg} at {path}".format(msg=exc.message, path=path)
+            raise InvalidYamlSchema(message) from exc
         else:
             return config
+
+    def build_configuration_provider(self, config, file_path):
+
+        def load_conf():
+            if file_path == '<stdin>':
+                log.info("Can't reload config from stdin")
+                return
+
+            try:
+                with open(file_path, "r") as conf_file:
+                    return self.parse_config(conf_file)
+            except ConfigError as exc:
+                log.error("Can't parse configuration: %s", exc)
+            except OSError as exc:
+                log.error("Can't read file: %s}", exc)
+
+        def provider_gen():
+            nonlocal config
+            yield config
+
+            while True:
+                yield load_conf()
+
+        conf_iterator = provider_gen()
+        return lambda: next(conf_iterator)
 
     @staticmethod
     def port_validator(port_str):
@@ -61,6 +120,8 @@ class XonoticExporterCli:
                             dest='host', help='listen addr')
         parser.add_argument('-p', '--port', type=cls.port_validator,
                             default=cls.DEFAULT_PORT, help='listen port')
+        parser.add_argument('--validate', action='store_true',
+                            help='Only validate configuration')
         parser.add_argument('config', type=argparse.FileType())
         return parser
 

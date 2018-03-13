@@ -4,9 +4,15 @@ from prometheus_client.parser import text_string_to_metric_families
 
 
 FAKE_CONFIG = {
-    'server1': None,
-    'server2': None,
-    'server3': None
+    'server1': {
+        'server': 'server1'
+    },
+    'server2': {
+        'server': 'server2'
+    },
+    'server3': {
+        'server': 'server3'
+    }
 }
 
 
@@ -48,8 +54,8 @@ FAKE_METRICS = {
 @pytest.fixture
 def cli(loop, aiohttp_client, mocker):
 
-    async def get_metrics(self, server):
-        return FAKE_METRICS[server]
+    async def get_metrics(self, server_conf):
+        return FAKE_METRICS[server_conf['server']]
 
     mocker.patch.object(XonoticExporter, 'get_metrics', new=get_metrics)
     exporter = XonoticExporter(loop, FAKE_CONFIG)
