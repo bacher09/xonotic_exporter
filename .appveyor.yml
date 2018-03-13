@@ -1,0 +1,21 @@
+version: 0.1.{build}
+environment:
+  global:
+    PYTHON: "C:\\Python36"
+  matrix:
+    - TOXENV: "py35"
+    - TOXENV: "py36"
+
+install:
+  - "%PYTHON%\\python.exe -m pip install wheel"
+
+build: off
+
+before_test:
+  - "%PYTHON%\\python.exe -m pip install tox"
+
+test_script:
+  - "%PYTHON%\\scripts\\tox"
+
+cache:
+  - '%LOCALAPPDATA%\pip\cache'
