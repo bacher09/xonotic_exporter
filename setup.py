@@ -1,9 +1,16 @@
 from setuptools import setup
+import os.path
+
+
+ROOT_PATH = os.path.dirname(__file__)
+with open(os.path.join(ROOT_PATH, "README.rst")) as f:
+    long_description = f.read()
 
 
 setup(
     name="xonotic_exporter",
     description="Xonotic metrics exporter for prometheus monitoring",
+    long_description=long_description,
     author="Slava Bacherikov",
     author_email="slava@bacher09.org",
     packages=["xonotic_exporter"],
