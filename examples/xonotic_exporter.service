@@ -1,0 +1,19 @@
+[Unit]
+Description=Xonotic exporter for prometheus monitoring
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/xonotic_exporter
+ExecStart=/opt/xonotic_exporter/venv/bin/xonotic_exporter regulars.yaml
+ExecReload=/bin/kill -HUP $MAINPID
+User=monitoring
+Group=monitoring
+Restart=always
+KillSignal=SIGTERM
+SystemCallFilter=~@debug @keyring @module @mount
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
