@@ -52,5 +52,5 @@ setup(
         'prometheus' 'nexuiz', 'metrics', 'monitoring'
     ],
     license="GPLv3",
-    version="0.1"
+    version="0.2dev"
 )
