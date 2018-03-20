@@ -88,7 +88,24 @@ Example prometheus configuration::
         - targets: ['public', 'private', 'ipv6-server']  # server names
 
 
+Other features
+--------------
+
+Instead off using configuration file you can start xonotic exporter using
+Python API. For more information `see this code`__. This gives you ability for
+dynamic configuration and server autodiscovery.
+
+__ dynamic_configuration
+
+If you going to deploy this service with systemd check examples folder, there
+is example `systemd unit`__ for this service.
+
+__ systemd_unit_
+
+
 .. _`Prometheus monitoring system`: https://prometheus.io/
 .. _json_schema: https://github.com/bacher09/xonotic_exporter/blob/master/xonotic_exporter/config_schema.json
 .. _blackbox: https://github.com/prometheus/blackbox_exporter
 .. _snmp: https://github.com/prometheus/snmp_exporter
+.. _dynamic_configuration: https://github.com/bacher09/xonotic_exporter/blob/master/xonotic_exporter/cli.py#L56
+.. _systemd_unit: https://github.com/bacher09/xonotic_exporter/blob/master/examples/xonotic_exporter.service
