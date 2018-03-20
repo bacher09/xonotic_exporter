@@ -13,6 +13,7 @@ setup(
     long_description=long_description,
     author="Slava Bacherikov",
     author_email="slava@bacher09.org",
+    url="https://github.com/bacher09/xonotic_exporter",
     packages=["xonotic_exporter"],
     include_package_data=True,
     install_requires=[
