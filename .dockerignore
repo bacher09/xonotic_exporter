@@ -1,0 +1,12 @@
+.git
+*.py[co]
+*.sw[op]
+venv/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+server.yml
+Dockerfile
+tox.ini
+examples
