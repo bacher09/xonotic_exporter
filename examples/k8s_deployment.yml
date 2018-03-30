@@ -1,0 +1,82 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xonotic-exporter-config
+data:
+  config.yml: |
+    pub.example.com:
+      server: pub.example.com
+      port: 26000
+      rcon_password: "secretpassword"
+      rcon_mode: 2
+    votable.example.net:
+      server: 203.0.113.12
+      port: 26001
+      rcon_mode: 1
+      rcon_password: "anotherpassword"
+    private.example.com:
+      server: private.example.com
+      port: 26000
+      rcon_mode: 1
+      rcon_password: "secretpassword"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xonotic-exporter
+  labels:
+    app: xonotic-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xonotic-exporter
+  template:
+    metadata:
+      labels:
+        app: xonotic-exporter
+    spec:
+      containers:
+      - name: xonotic-exporter
+        image: bacher09/xonotic_exporter
+        command: ["xonotic_exporter", "--listen-host", "0.0.0.0", "config.yml"]
+        volumeMounts:
+        - name: exporter-config
+          mountPath: /etc/xonotic_exporter
+        ports:
+        - containerPort: 9260
+          protocol: "TCP"
+        resources:
+          requests:
+            cpu: 0.1
+            memory: "48Mi"
+          limits:
+            cpu: 0.2
+            memory: "96Mi"
+        readinessProbe:
+          timeoutSeconds: 2
+          httpGet:
+            path: /
+            port: 9260
+        livenessProbe:
+          timeoutSeconds: 2
+          httpGet:
+            path: /
+            port: 9260
+      volumes:
+      - name: exporter-config
+        configMap:
+         name: xonotic-exporter-config
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: xonotic-exporter
+spec:
+  selector:
+    app: xonotic-exporter
+  ports:
+  - protocol: TCP
+    port: 8080
+    targetPort: 9260
