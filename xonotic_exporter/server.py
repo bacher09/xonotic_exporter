@@ -94,9 +94,11 @@ class XonoticExporter:
             proto_builder, remote_addr=addr
         )
         transport, proto = await connection_task
-        metrics = await proto.get_metrics()
-        transport.close()
-        return metrics
+        try:
+            metrics = await proto.get_metrics()
+            return metrics
+        finally:
+            transport.close()
 
     def reload(self):
         "Reload server configuration"
