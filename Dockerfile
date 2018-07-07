@@ -1,4 +1,4 @@
-FROM alpine:3.7
+FROM alpine:3.8
 ADD . /src
 RUN apk --no-cache add python3 py3-yaml && \
     cd /src && python3 setup.py install && \
