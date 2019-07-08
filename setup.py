@@ -20,7 +20,7 @@ setup(
         "xrcon==0.1",
         "aiohttp>=3.0,<4.0",
         "mako>=1.0.0,<1.1.0",
-        "jsonschema>=2.6.0,<2.7.0",
+        "jsonschema>=3.0.1,<3.1.0",
         "pyyaml"
     ],
     tests_require=[
@@ -28,7 +28,7 @@ setup(
         'pytest-cov',
         'pytest-aiohttp',
         'pytest-mock',
-        'prometheus_client'
+        'prometheus_client>=0.7.1,<0.8'
     ],
     setup_requires=['pytest-runner'],
     classifiers=[

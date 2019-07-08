@@ -80,12 +80,11 @@ async def test_metrics(cli):
     assert resp.status == 200
     text = await resp.text()
     for family in text_string_to_metric_families(text):
-        for sample in family.samples:
-            name, labels, value = sample
-            assert labels['instance'] == 'server1'
-            metrics_name = name[prefix_len:]
+        for metric in family.samples:
+            assert metric.labels['instance'] == 'server1'
+            metrics_name = metric.name[prefix_len:]
             if metrics_name != 'rtt':
-                assert value == FAKE_METRICS['server1'][metrics_name]
+                assert metric.value == FAKE_METRICS['server1'][metrics_name]
 
     resp2 = await cli.get('/metrics', params={"target": "server2"})
     assert resp2.status == 200
@@ -93,11 +92,10 @@ async def test_metrics(cli):
     assert resp3.status == 200
     text = await resp3.text()
     for family in text_string_to_metric_families(text):
-        for sample in family.samples:
-            name, labels, value = sample
-            assert labels['instance'] == 'server3'
-            if name == 'xonotic_sv_public':
-                assert value == 1
+        for metric in family.samples:
+            assert metric.labels['instance'] == 'server3'
+            if metric.name == 'xonotic_sv_public':
+                assert metric.value == 1
 
     resp_inv = await cli.get('/metrics', params={"target": "server4"})
     assert resp_inv.status == 400

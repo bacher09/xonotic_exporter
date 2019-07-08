@@ -59,7 +59,7 @@ class XonoticExporterCli:
 
     def parse_config(self, str_or_stream):
         try:
-            config = yaml.load(str_or_stream)
+            config = yaml.safe_load(str_or_stream)
         except yaml.YAMLError as exc:
             raise InvalidYamlConfig('Invalid yaml document') from exc
 

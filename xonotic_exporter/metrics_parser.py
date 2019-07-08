@@ -7,20 +7,20 @@ class IllegalState(ValueError):
 
 class XonoticMetricsParser:
 
-    COLORS_RE = re.compile(b"\^(?:\d|x[\dA-Fa-f]{3})")
-    SV_PUBLIC_RE = re.compile(b'^"sv_public"\s+is\s+"(-?\d+)"')
-    HOST_RE = re.compile(b'^host:\s+(.+)$')
-    MAP_RE = re.compile(b'^map:\s+([^\s]+)')
+    COLORS_RE = re.compile(rb"\^(?:\d|x[\dA-Fa-f]{3})")
+    SV_PUBLIC_RE = re.compile(rb'^"sv_public"\s+is\s+"(-?\d+)"')
+    HOST_RE = re.compile(rb'^host:\s+(.+)$')
+    MAP_RE = re.compile(rb'^map:\s+([^\s]+)')
     TIMING_RE = re.compile(
-        b'^timing:\s+'
-        b'(?P<cpu>-?[\d\.]+)%\s+CPU,\s+'
-        b'(?P<lost>-?[\d\.]+)%\s+lost,\s+'
-        b'offset\s+avg\s+(?P<offset_avg>-?[\d\.]+)ms,\s+'
-        b'max\s+(?P<max>-?[\d\.]+)ms,\s+'
-        b'sdev\s+(?P<sdev>-?[\d\.]+)ms'
+        rb'^timing:\s+'
+        rb'(?P<cpu>-?[\d\.]+)%\s+CPU,\s+'
+        rb'(?P<lost>-?[\d\.]+)%\s+lost,\s+'
+        rb'offset\s+avg\s+(?P<offset_avg>-?[\d\.]+)ms,\s+'
+        rb'max\s+(?P<max>-?[\d\.]+)ms,\s+'
+        rb'sdev\s+(?P<sdev>-?[\d\.]+)ms'
     )
     PLAYERS_RE = re.compile(
-        b'^players:\s+(?P<count>\d+)\s+active\s+\((?P<max>\d+)\s+max\)'
+        rb'^players:\s+(?P<count>\d+)\s+active\s+\((?P<max>\d+)\s+max\)'
     )
 
     def __init__(self):
