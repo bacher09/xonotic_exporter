@@ -5,6 +5,7 @@ environment:
   matrix:
     - TOXENV: "py35"
     - TOXENV: "py36"
+    - TOXENV: "py37"
 
 install:
   - "%PYTHON%\\python.exe -m pip install wheel"
