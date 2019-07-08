@@ -3,8 +3,6 @@ environment:
   global:
     PYTHON: "C:\\Python36"
   matrix:
-    - TOXENV: "py35"
-    - TOXENV: "py36"
     - TOXENV: "py37"
 
 install:
